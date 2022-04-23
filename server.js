@@ -271,7 +271,7 @@ app.get('/api/getReviews', function(req, res) {
 hostFolder('/style')
 hostFolder('/content')
 hostFile('index.js')
-hostFile('', '/index.html')
+app.get('/', function(req, res) { res.sendFile(__dirname + '/index.html') })
 
 app.listen(app.get('port'), function() {
     console.log('Express server active on port %d', app.get('port'))
