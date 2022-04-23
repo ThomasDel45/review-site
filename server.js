@@ -2,6 +2,7 @@
 // Express server settings
 const express = require('express')
 const cookieParser = require('cookie-parser')
+const { v4: uuidv4 } = require('uuid');
 const app = express()
 
 app.set('port', 3111)
@@ -165,18 +166,18 @@ app.post('/api/login', function(req, res) {
 
             if(account) {
 
-                const uid = parseInt(Math.ceil(Math.random() * Date.now()).toPrecision(16).toString().replace(".", ""))
+                const uuid = uuidv4()
         
                 userSessions.push({
                     username: user,
-                    _ID: uid,
-                    _timeout: makeSessionTimeout(uid)
+                    _ID: uuid,
+                    _timeout: makeSessionTimeout(uuid)
                 })
             
-                console.log('\tLogging in user ' + user + ' as session ' + uid)
+                console.log('\tLogging in user ' + user + ' as session ' + uuid)
 
-                res.cookie('session', uid, { maxAge: sessionDuration })
-                touchSession(uid)
+                res.cookie('session', uuid, { maxAge: sessionDuration })
+                touchSession(uuid)
                 if(req.query.target)
                     res.redirect(req.query.target)
                 else
