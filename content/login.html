@@ -1,0 +1,29 @@
+<link rel="stylesheet" href="style/login.css">
+<div id="title" class="shrinkable center-content title-box">
+    Login
+</div>
+<form id="login-form" class="fill-space group login-form-container" action="/api/login?target=/" method="post">
+    <div class="padding" style="height:20px"></div>
+    <div class="fill-space content content-prefer-top">
+        <div class="group">
+            <label for="username">Username:</label>
+            <input class="textfield" name="username" id="username" type="text">    
+        </div>
+        <div class="padding" style="height:20px"></div>
+        <div class="group">
+            <label for="password">Password:</label>
+            <input class="textfield" name="password" id="password" type="password">
+        </div>
+        <div id="error-reason" class="error-reason"></div>
+    </div>
+    <div class="padding" style="height:30px"></div>
+    <div class="line"></div>
+    <div class="padding" style="height:20px"></div>
+    <div class="shrinkable content content-prefer-bot">
+        <input id="btn-switch" class="btn btn-new-account" type="button" value="Create an Account"></input>
+        <input id="submit" class="btn btn-submit" type="submit"></input>
+    </div>
+    <script type="text/javascript">
+        document.getElementById('createAccount').onclick = function () { location.href = "/createAccount" }
+    </script>
+</form>

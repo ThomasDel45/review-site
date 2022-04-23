@@ -1,0 +1,55 @@
+
+.review-short-summary {
+    
+}
+
+.review-profile {
+    border-radius: 50%;
+    flex: 0 1 75px;
+    min-width: 25px;
+    max-width: 75px;
+}
+
+.review-short-summary-container {
+    display: flex;
+    flex-direction: column;
+    border-left: 2px solid black;
+}
+
+.review-user-details {
+    margin: 5px;
+    align-items: center;
+}
+
+.review-score-holder {
+    display:flex;
+    gap: 5px
+}
+
+.review-score-holder * {
+    flex: 0 0 auto;
+}
+
+.review-score {
+    flex: 0 1 35px;
+    min-width: 25px;
+    max-width: 35px;
+    text-align: center;
+}
+
+.review-movie-name {
+    display: flex;
+    flex-basis: 30px;
+    align-items: center;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.review-text {
+    padding: 5px;
+    flex-basis: 75px;
+}
+
+.review-summary-btns * {
+    width: 50%;
+}

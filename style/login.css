@@ -1,0 +1,59 @@
+
+.content-block {
+    min-height: 300px;
+}
+
+.login-form-container {
+    min-height: 200px;
+    padding: 10px;
+    padding-top: 0px;
+}
+
+.login-form-container .content {
+    width: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.login-form-container .group {
+    display:flex;
+    flex-direction: column;
+}
+
+.login-form-container .content-prefer-top {
+    flex: 1 1 fit-content;
+    min-height: 120px;
+}
+.login-form-container .content-prefer-bot {
+    flex: 0 1 fit-content;
+    margin-top: 5px;
+}
+
+.login-form-container * .btn {
+    margin-top: 10px;
+    flex: 0 1 40px;
+}
+
+.login-form-container * .btn-new-account {
+    margin-top: 0px
+}
+
+.login-form-container * .label {
+}
+
+.login-form-container * .error-reason {
+    width: 100%;
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    color: red;
+}
+
+.login-form-container * .textfield {
+    margin: 5px;
+    height: 25px;
+}
+
+#username {
+    text-justify: center;
+}

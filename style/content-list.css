@@ -1,0 +1,21 @@
+
+.content-block {
+    gap: 20px;
+}
+
+.content-block .btn-return {
+    height: 40px;
+}
+
+.content-list {
+
+    padding: 5px;
+
+    max-height: 70vh;
+    overflow-x: hidden;  
+    overflow-y: auto;  
+    
+    display: flex;
+    flex-direction: column;
+    gap: 10px
+}
