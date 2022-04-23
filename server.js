@@ -9,12 +9,8 @@ app.use(express.urlencoded( { extended: true } )) // Allow HTML form POST
 app.use(cookieParser()) // Handle cookies 
 const sessionDuration = 1.8e+6
 
-function hostFile(path) {
-    app.get('/' + path, function(req, res) { res.sendFile(__dirname + '/' + path) })
-}
-
-function hostFile(alias, path) {
-    app.get('/' + alias, function(req, res) { res.sendFile(__dirname + '/' + path) })
+function hostFile(path, alias) {
+    app.get('/' + (alias ? alias : path), function(req, res) { res.sendFile(__dirname + '/' + path) })
 }
 
 function hostFolder(folder) {
