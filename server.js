@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser')
 const app = express()
 
 app.set('port', 3111)
+app.use(express.json()) // Allow JSON data
 app.use(express.urlencoded( { extended: true } )) // Allow HTML form POST
 app.use(cookieParser()) // Handle cookies 
 const sessionDuration = 1.8e+6
@@ -16,6 +17,16 @@ function hostFile(path, alias) {
 function hostFolder(folder) {
     app.use(folder, express.static(__dirname + folder + '/'))
 }
+
+// Log API calls
+app.use(function(req, res, next) {
+
+    if (req.path.startsWith('/api/'))
+        console.log('\nRecieved API request: ' + req.method + ' ' + req.path)
+
+    next()
+
+})
 
 // MongoDB settings
 const mongo = require('mongodb')
@@ -150,7 +161,7 @@ app.post('/api/login', function(req, res) {
     const user = req.body.username
     const pass = req.body.password
 
-    // Log out the user if they are already logged in\
+    // Log out the user if they are already logged in
     deleteSessionUser(user)
 
     MongoClient.connect(dbURL)
@@ -169,6 +180,7 @@ app.post('/api/login', function(req, res) {
         
                 userSessions.push({
                     username: user,
+                    userid: account._id,
                     _ID: uid,
                     _timeout: makeSessionTimeout(uid)
                 })
@@ -247,6 +259,8 @@ app.use(function(req, res, next) {
         return res.redirect('/login')
     }
 
+    console.log('\tSESSION: ' + req.cookies.session)
+
     // Refresh the session
     res.cookie('session', req.cookies.session, { maxAge: sessionDuration })
     touchSession(req.cookies.session)
@@ -254,15 +268,373 @@ app.use(function(req, res, next) {
     next()
 })
 
-// API Urls
-app.get('/api/getReviews', function(req, res) {
+// ======================= API Urls =======================
+
+/**
+ * Create a review for a given movie
+ * 
+ * USAGE: POST /api/review
+ *        pass the contents of an HTML form. 
+ *        ie. doRequest('POST', '/api/review', formData)
+ * 
+ * PARAMS:
+ *      movie: MongoDB ObjectID corresponding to a movie in the database
+ *      score: the review score
+ *      text: the review text
+ */
+app.post('/api/review', function(req, res) {
+
+    const sessionRecord = findSession(req.cookies.session)
+
+    if (!sessionRecord) {
+        res.status(403).send('Please log in.')
+        return
+    }
+
+    const reviewRecord = {
+        owner: sessionRecord.userid,
+        movie: new mongo.ObjectId(req.body.movie),
+        score: req.body.score,
+        text: req.body.text
+    }
 
     MongoClient.connect(dbURL)
     .then(conn => {
-        conn.close()
+        const db = conn.db('jnf-review')
+
+        // Make sure the review is for a valid movie
+        const movies = db.collection('movies')
+        movies.findOne({
+            "_id": reviewRecord.movie
+        })
+        .then(movie => {
+
+            if (movie == undefined) {
+                conn.close()
+                res.status(400).send('Review refers to an invalid movie')
+            } else {
+
+                const reviews = db.collection('reviews')
+
+                // Prevent duplicate reviews
+                reviews.findOne({
+                    owner: reviewRecord.owner,
+                    movie: reviewRecord.movie
+                }).then(similarReview => {
+
+                    if(similarReview) {
+                        res.status(400).send('You have already reviewed this movie.')
+                        conn.close()
+                    } else {
+
+                        // Finally actually inser the record
+                        reviews.insertOne(reviewRecord)
+                        .then(record => {
+                            res.status(200).json(record)
+                        })
+                        .catch(err => {
+                            console.log('Error while creating a review: ' + err)
+                            res.status(500).send('Internal server error')
+                        })
+                        .finally(() =>{
+                            conn.close()
+                        })
+
+                    }
+
+                })
+                .catch(err =>{
+                    conn.close()
+                    console.log('Error while retrieving reviews: ' + err)
+                    res.status(500).send('Internal server error')
+                })
+            
+            }
+
+        })
+        .catch(err => {
+            conn.close()
+            console.log('Error while retrieving movies: ' + err)
+            res.status(500).send('Internal server error')
+        })
+
     })
     .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
 
+})
+
+/**
+ * Edit a review
+ * 
+ * USAGE: PUT /api/review?id=**someID**
+ *        pass the contents of an HTML form in the body. 
+ *        ie. doRequest('POST', '/api/review?id=**someID**', formData)
+ * 
+ * PARAMS:
+ *      score: the new review score
+ *      text: the new review text
+ */
+app.put('/api/review', function(req, res) {
+
+    const sessionRecord = findSession(req.cookies.session)
+
+    if (!sessionRecord) {
+        res.status(403).send('Please log in.')
+        return
+    }
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const reviews = db.collection('reviews')
+
+        reviews.findOneAndUpdate({
+            owner: sessionRecord.userid,
+            "_id": new mongo.ObjectId(req.query.id)
+        }, {
+            $set: {
+                score: req.body.score,
+                text: req.body.text
+            }
+        })
+        .then(record => {
+            if(record.value)
+                res.status(200).json(record)
+            else
+                res.status(400).send('No such review found')
+        })
+        .catch(err => {
+            console.log('Error while searching for review: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        .finally(() => {
+            conn.close()
+        })
+
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
+
+})
+
+/**
+ * Deletes a review
+ * 
+ * USAGE: DELETE /api/review?id=**someID**
+ * 
+ */
+app.delete('/api/review', function(req, res) {
+
+    const sessionRecord = findSession(req.cookies.session)
+
+    if (!sessionRecord) {
+        res.status(403).send('Please log in.')
+        return
+    }
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const reviews = db.collection('reviews')
+
+        reviews.findOneAndDelete({
+            owner: sessionRecord.userid,
+            "_id": new mongo.ObjectId(req.query.id)
+        })
+        .then(result => {
+            if(result.value)
+                res.status(200).send("Success")
+            else
+                res.status(400).send("No such review found")
+        })
+        .catch(err => {
+            console.log('Error while trying to find and delete a review: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        .finally(() => {
+            conn.close()
+        })
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
+
+})
+
+/**
+ * Gets all reviews associated to the current user's account.
+ * 
+ * USAGE: GET /api/review
+ * 
+ */
+app.get('/api/review', function(req, res) {
+
+    const sessionRecord = findSession(req.cookies.session)
+
+    if (!sessionRecord) {
+        res.status(403).send('Please log in.')
+        return
+    }
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const reviews = db.collection('reviews')
+        reviews.find({
+            owner: sessionRecord.userid,
+        }).toArray()
+        .then(records => {
+            res.status(200).json({
+                reviews: records
+            })
+        })
+        .catch(err => {
+            console.log('Error while retrieving reviews: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        .finally(() => {
+            conn.close()
+        })
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
+
+})
+
+// Create a movie
+app.post('/api/movie', function(req, res) {
+
+    const sessionRecord = findSession(req.cookies.session)
+
+    if (!sessionRecord) {
+        res.status(403).send('Please log in.')
+        return
+    } else if (sessionRecord.username !== "admin") {
+        res.status(403).send('Admins only.')
+        return
+    }
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const movies = db.collection('movies')
+        movies.insertOne({
+            name: req.body.name
+        })
+        .then(record => {
+            res.status(200).json(record)
+        })
+        .catch(err => {
+            console.log('Error while creating a movie: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        .finally(() =>{
+            conn.close()
+        })
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
+
+})
+
+// Get movies
+app.get('/api/movie', function(req, res) {
+
+    const filter = req.query.name ? { name: req.query.name } : null
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const movies = db.collection('movies')
+        movies.find(filter).toArray()
+        .then(records => {
+            res.status(200).json(records)
+        })
+        .catch(err => {
+            console.log('Couldn\'t connect to server: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        .finally(() => {
+            conn.close()
+        })
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
+    })
+
+})
+
+// Get reviews given movie
+app.get('/api/movie/reviews', function(req, res) {
+
+    const filter = { }
+
+    if (req.query.id)
+        filter._id = new mongo.ObjectId(req.query.id)
+
+    if (req.query.name)
+        filter.name = req.query.name
+
+    MongoClient.connect(dbURL)
+    .then(conn => {
+        const db = conn.db('jnf-review')
+        const movies = db.collection('movies')
+
+        movies.find(filter).toArray()
+        .then(movies => {
+
+            if (movies.length > 1) {
+                conn.close()
+                res.status(400).send('Query parameters too vague: '
+                    + 'there are multiple movies meeting the criteria!')
+            } else if (movies.length < 1) {
+                conn.close()
+                res.status(400).send('No such movie found')
+            } else {
+
+                console.log('finding movies')
+                const movie = movies[0]
+                const reviews = db.collection('reviews')
+                reviews.find({
+                    movie: movie._id
+                }).toArray()
+                .then(results => {
+                    res.status(200).json({
+                        reviews: results
+                    })
+                })
+                .catch(err => {
+                    console.log('Error while retrieving reviews: ' + err)
+                    res.status(500).send('Internal server error')
+                })
+                .finally(() => {
+                    console.log('complete')
+                    conn.close()
+                })
+
+            }
+
+        }).catch(err => {
+            conn.close()
+            console.log('Error while retrieving movies: ' + err)
+            res.status(500).send('Internal server error')
+        })
+        
+    })
+    .catch(err => {
+        console.log('Couldn\'t connect to server: ' + err)
+        res.status(500).send('Internal server error')
     })
 
 })
